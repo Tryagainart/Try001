@@ -60,3 +60,7 @@ flutter analyze
 1. **官方渠道**：注册 Apple Developer（$99/年）→ 通过 Xcode/Codemagic 签名 → TestFlight 或 App Store 分发
 2. **侧载方式**（7天有效）：使用 AltStore 或 Sideloadly 安装未签名的 .ipa
 3. **TestFlight 测试**（推荐）：通过 Apple Developer 邀请测试用户
+
+
+---
+编译触发测试
