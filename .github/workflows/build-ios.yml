@@ -26,34 +26,39 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
-      - name: Check Flutter version
-        run: |
-          flutter --version
-          dart --version
-
       - name: Build iOS (no codesign)
+        run: flutter build ios --release --no-codesign
+
+      - name: Find and list build output
         run: |
-          flutter build ios --release --no-codesign 2>&1 | tee build_log.txt
+          echo "=== Listing build/ios directory ==="
+          find build/ios -name "*.app" -type d 2>/dev/null || echo "No .app found"
+          echo "=== Full tree ==="
+          ls -la build/ios/iphoneos/ 2>/dev/null || echo "iphoneos dir not found"
+          ls -la build/ios/build/ 2>/dev/null || echo "build dir not found"
+          echo "=== Search Runner.app ==="
+          find build/ios -name "Runner.app" -type d
 
       - name: Package .ipa
         run: |
-          cd build/ios/iphoneos
+          APP_PATH=$(find build/ios -name "Runner.app" -type d | head -1)
+          echo "Found Runner.app at: $APP_PATH"
           mkdir -p Payload
-          cp -r Runner.app Payload/
+          cp -r "$APP_PATH" Payload/
           zip -r -9 TaskPlanner.ipa Payload/
-
-      - name: Upload build log on failure
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: build-log
-          path: build_log.txt
-          retention-days: 7
 
       - name: Upload .ipa artifact
         if: success()
         uses: actions/upload-artifact@v4
         with:
           name: TaskPlanner-ipa
-          path: build/ios/iphoneos/TaskPlanner.ipa
+          path: TaskPlanner.ipa
           retention-days: 30
+
+      - name: Upload build output on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-debug-info
+          path: build/ios/
+          retention-days: 7
