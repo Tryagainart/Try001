@@ -26,26 +26,40 @@ jobs:
       - name: Build iOS (no codesign)
         run: |
           flutter build ios --release --no-codesign 2>&1 | tee /tmp/build_log.txt
-          echo "EXIT_CODE=$?" >> $GITHUB_ENV
+          echo "EXIT_CODE=${PIPESTATUS[0]}" >> $GITHUB_ENV
 
-      - name: Find Runner.app
-        if: always()
+      - name: Verify build output
         run: |
           echo "=== Build exit code: ${{ env.EXIT_CODE }} ==="
-          echo "=== Searching entire workspace ==="
+          echo "=== Looking for Runner.app ==="
           find . -name "Runner.app" -type d 2>/dev/null
-          echo "=== build directory contents ==="
-          find build -maxdepth 4 -type f -o -type d 2>/dev/null | head -50
-          echo "=== Build log tail ==="
-          tail -30 /tmp/build_log.txt
+          echo "=== build/ios directory ==="
+          ls -la build/ios/ 2>/dev/null || echo "build/ios not found"
+          echo "=== build/ios/iphoneos directory ==="
+          ls -la build/ios/iphoneos/ 2>/dev/null || echo "build/ios/iphoneos not found"
+          echo "=== Last 20 lines of build log ==="
+          tail -20 /tmp/build_log.txt
 
       - name: Package .ipa
         run: |
-          APP_PATH=$(find . -name "Runner.app" -type d | head -1)
-          echo "Using: $APP_PATH"
+          APP_PATH=$(find build/ios/iphoneos -name "Runner.app" -type d 2>/dev/null | head -1)
+          if [ -z "$APP_PATH" ]; then
+            echo "ERROR: Runner.app not found in build/ios/iphoneos"
+            echo "Trying broader search..."
+            APP_PATH=$(find . -name "Runner.app" -type d 2>/dev/null | head -1)
+          fi
+          if [ -z "$APP_PATH" ]; then
+            echo "FATAL: Runner.app not found anywhere"
+            exit 1
+          fi
+          echo "Found Runner.app at: $APP_PATH"
+          echo "=== Verifying Info.plist exists ==="
+          ls -la "$APP_PATH/Info.plist"
           mkdir -p Payload
           cp -r "$APP_PATH" Payload/
           zip -r -9 TaskPlanner.ipa Payload/
+          echo "=== Verifying .ipa contents ==="
+          unzip -l TaskPlanner.ipa | head -20
 
       - name: Upload build log
         if: always()
