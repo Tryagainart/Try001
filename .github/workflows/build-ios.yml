@@ -23,34 +23,17 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
-      - name: Run CocoaPods separately
-        working-directory: ios
-        run: |
-          echo "=== Pod version ==="
-          pod --version
-          echo "=== Running pod install ==="
-          pod install --repo-update 2>&1 | tee /tmp/pod_log.txt
-          echo "EXIT_CODE=$?" >> $GITHUB_ENV
-          echo "=== Pod install done ==="
-
       - name: Build iOS (no codesign)
         run: |
           flutter build ios --release --no-codesign 2>&1 | tee /tmp/build_log.txt
           echo "EXIT_CODE=${PIPESTATUS[0]}" >> $GITHUB_ENV
 
-      - name: Inspect build output
+      - name: Show full build log
         if: always()
         run: |
-          echo "=== Build exit code: ${{ env.EXIT_CODE }} ==="
-          echo "=== Pod exit code: ${{ env.EXIT_CODE }} ==="
-          echo "=== Runner.app tree ==="
-          find build/ios -name "Runner.app" -type d 2>/dev/null
-          echo "=== Full build tree (depth 4) ==="
-          find build -maxdepth 4 2>/dev/null | head -80
-          echo "=== Last 30 lines of build log ==="
-          tail -30 /tmp/build_log.txt
-          echo "=== Last 20 lines of pod log ==="
-          tail -20 /tmp/pod_log.txt
+          echo "=== EXIT CODE: ${{ env.EXIT_CODE }} ==="
+          echo "=== Full build log ==="
+          cat /tmp/build_log.txt
 
       - name: Package .ipa
         run: |
@@ -74,15 +57,9 @@ jobs:
           fi
           
           echo "Found valid Runner.app at: $APP_PATH"
-          echo "=== App contents ==="
-          ls -la "$APP_PATH/"
-          echo "=== App size ==="
-          du -sh "$APP_PATH"
-          
           mkdir -p Payload
           cp -r "$APP_PATH" Payload/Runner.app
           zip -r -9 TaskPlanner.ipa Payload/
-          
           echo "=== .ipa verification ==="
           unzip -l TaskPlanner.ipa | grep "Runner" | head -20
 
@@ -92,14 +69,6 @@ jobs:
         with:
           name: build-log
           path: /tmp/build_log.txt
-          retention-days: 7
-
-      - name: Upload pod log
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: pod-log
-          path: /tmp/pod_log.txt
           retention-days: 7
 
       - name: Upload .ipa artifact

@@ -256,7 +256,7 @@ class _HomePageState extends State<HomePage> {
                   final time = await showTimePicker(
                     context: context,
                     initialTime: selectedTime != null
-                        ? _parseTimeOfDay(selectedTime)
+                        ? _parseTimeOfDay(selectedTime!)
                         : TimeOfDay.now(),
                     helpText: '选择时间',
                   );
