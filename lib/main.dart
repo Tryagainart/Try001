@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:table_calendar/table_calendar.dart';
-import 'package:speech_to_text/speech_to_text.dart' as stt;
 import 'package:uuid/uuid.dart';
 import 'package:intl/intl.dart';
 import 'models/task_model.dart';
@@ -47,8 +46,11 @@ class _HomePageState extends State<HomePage> {
   DateTime _selectedDay = DateTime.now();
   CalendarFormat _calendarFormat = CalendarFormat.month;
 
-  // 语音识别
-  final stt.SpeechToText _speech = stt.SpeechToText();
+  // 语音识别 - 暂时禁用
+  // final stt.SpeechToText _speech = stt.SpeechToText();
+  // bool _speechAvailable = false;
+  // bool _isListening = false;
+  // String _speechText = '';
   bool _speechAvailable = false;
   bool _isListening = false;
   String _speechText = '';
@@ -59,7 +61,7 @@ class _HomePageState extends State<HomePage> {
   void initState() {
     super.initState();
     _loadTasks();
-    _initSpeech();
+    // _initSpeech();
   }
 
   Future<void> _loadTasks() async {
@@ -71,17 +73,8 @@ class _HomePageState extends State<HomePage> {
   }
 
   void _initSpeech() async {
-    _speechAvailable = await _speech.initialize(
-      onError: (error) {
-        setState(() => _isListening = false);
-      },
-      onStatus: (status) {
-        if (status == 'done' || status == 'notListening') {
-          setState(() => _isListening = false);
-        }
-      },
-    );
-    setState(() {});
+    // 语音识别暂时禁用 - 需要原生插件支持
+    _speechAvailable = false;
   }
 
   List<TaskModel> get _selectedDayTasks {
@@ -112,26 +105,12 @@ class _HomePageState extends State<HomePage> {
   // ---- 语音识别 ----
   void _startListening() async {
     if (!_speechAvailable) {
-      _showMessage('语音识别不可用');
+      _showMessage('语音识别暂未启用');
       return;
     }
-    setState(() {
-      _speechText = '';
-      _isListening = true;
-    });
-    await _speech.listen(
-      onResult: (result) {
-        setState(() {
-          _speechText = result.recognizedWords;
-        });
-      },
-      localeId: 'zh_CN',
-      listenMode: stt.ListenMode.dictation,
-    );
   }
 
   void _stopListening() async {
-    await _speech.stop();
     setState(() => _isListening = false);
   }
 
