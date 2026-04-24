@@ -92,7 +92,7 @@ class _HomePageState extends State<HomePage> {
       });
   }
 
-  int get _taskCountForDay(DateTime day) {
+  int _taskCountForDay(DateTime day) {
     return _allTasks
         .where((t) =>
             t.date.year == day.year &&
