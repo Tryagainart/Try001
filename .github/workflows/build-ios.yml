@@ -5,9 +5,6 @@ on:
     branches: [ main ]
   workflow_dispatch:
 
-env:
-  NODE_OPTIONS: --max-old-space-size=4096
-
 jobs:
   build-ios:
     runs-on: macos-latest
@@ -27,25 +24,36 @@ jobs:
         run: flutter pub get
 
       - name: Build iOS (no codesign)
-        run: flutter build ios --release --no-codesign
-
-      - name: Find and list build output
         run: |
-          echo "=== Listing build/ios directory ==="
-          find build/ios -name "*.app" -type d 2>/dev/null || echo "No .app found"
-          echo "=== Full tree ==="
-          ls -la build/ios/iphoneos/ 2>/dev/null || echo "iphoneos dir not found"
-          ls -la build/ios/build/ 2>/dev/null || echo "build dir not found"
-          echo "=== Search Runner.app ==="
-          find build/ios -name "Runner.app" -type d
+          flutter build ios --release --no-codesign 2>&1 | tee /tmp/build_log.txt
+          echo "EXIT_CODE=$?" >> $GITHUB_ENV
+
+      - name: Find Runner.app
+        if: always()
+        run: |
+          echo "=== Build exit code: ${{ env.EXIT_CODE }} ==="
+          echo "=== Searching entire workspace ==="
+          find . -name "Runner.app" -type d 2>/dev/null
+          echo "=== build directory contents ==="
+          find build -maxdepth 4 -type f -o -type d 2>/dev/null | head -50
+          echo "=== Build log tail ==="
+          tail -30 /tmp/build_log.txt
 
       - name: Package .ipa
         run: |
-          APP_PATH=$(find build/ios -name "Runner.app" -type d | head -1)
-          echo "Found Runner.app at: $APP_PATH"
+          APP_PATH=$(find . -name "Runner.app" -type d | head -1)
+          echo "Using: $APP_PATH"
           mkdir -p Payload
           cp -r "$APP_PATH" Payload/
           zip -r -9 TaskPlanner.ipa Payload/
+
+      - name: Upload build log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-log
+          path: /tmp/build_log.txt
+          retention-days: 7
 
       - name: Upload .ipa artifact
         if: success()
@@ -54,11 +62,3 @@ jobs:
           name: TaskPlanner-ipa
           path: TaskPlanner.ipa
           retention-days: 30
-
-      - name: Upload build output on failure
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: build-debug-info
-          path: build/ios/
-          retention-days: 7
