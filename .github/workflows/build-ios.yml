@@ -23,58 +23,68 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
+      - name: Run CocoaPods separately
+        working-directory: ios
+        run: |
+          echo "=== Pod version ==="
+          pod --version
+          echo "=== Running pod install ==="
+          pod install --repo-update 2>&1 | tee /tmp/pod_log.txt
+          echo "EXIT_CODE=$?" >> $GITHUB_ENV
+          echo "=== Pod install done ==="
+
       - name: Build iOS (no codesign)
         run: |
           flutter build ios --release --no-codesign 2>&1 | tee /tmp/build_log.txt
           echo "EXIT_CODE=${PIPESTATUS[0]}" >> $GITHUB_ENV
 
+      - name: Inspect build output
+        if: always()
+        run: |
+          echo "=== Build exit code: ${{ env.EXIT_CODE }} ==="
+          echo "=== Pod exit code: ${{ env.EXIT_CODE }} ==="
+          echo "=== Runner.app tree ==="
+          find build/ios -name "Runner.app" -type d 2>/dev/null
+          echo "=== Full build tree (depth 4) ==="
+          find build -maxdepth 4 2>/dev/null | head -80
+          echo "=== Last 30 lines of build log ==="
+          tail -30 /tmp/build_log.txt
+          echo "=== Last 20 lines of pod log ==="
+          tail -20 /tmp/pod_log.txt
+
       - name: Package .ipa
         run: |
-          # Flutter 3.27 outputs to build/ios/Release-iphoneos/
           APP_PATH=""
           for dir in "build/ios/Release-iphoneos/Runner.app" "build/ios/iphoneos/Runner.app"; do
-            if [ -d "$dir" ]; then
+            if [ -d "$dir" ] && [ -f "$dir/Runner" ]; then
               APP_PATH="$dir"
               break
             fi
           done
           
-          # Fallback: search everywhere
           if [ -z "$APP_PATH" ]; then
-            APP_PATH=$(find . -name "Runner.app" -type d 2>/dev/null | head -1)
+            APP_PATH=$(find . -name "Runner.app" -type d 2>/dev/null | while read d; do
+              if [ -f "$d/Runner" ]; then echo "$d"; break; fi
+            done)
           fi
           
           if [ -z "$APP_PATH" ]; then
-            echo "FATAL: Runner.app not found"
-            echo "=== build directory tree ==="
-            find build -maxdepth 5 2>/dev/null | head -50
+            echo "FATAL: Valid Runner.app with Runner executable not found"
             exit 1
           fi
           
-          echo "Found Runner.app at: $APP_PATH"
-          
-          # Show app structure
-          echo "=== Runner.app contents ==="
+          echo "Found valid Runner.app at: $APP_PATH"
+          echo "=== App contents ==="
           ls -la "$APP_PATH/"
-          echo "=== Size ==="
+          echo "=== App size ==="
           du -sh "$APP_PATH"
           
-          # Create standard ipa structure
           mkdir -p Payload
           cp -r "$APP_PATH" Payload/Runner.app
-          
-          # Verify executable exists
-          if [ ! -f "Payload/Runner.app/Runner" ]; then
-            echo "FATAL: Runner executable not found in app bundle"
-            exit 1
-          fi
-          
-          echo "=== Runner executable found ✓ ==="
           zip -r -9 TaskPlanner.ipa Payload/
           
-          # Verify ipa
-          echo "=== .ipa contents ==="
-          unzip -l TaskPlanner.ipa | grep -E "(Runner|Info)" | head -20
+          echo "=== .ipa verification ==="
+          unzip -l TaskPlanner.ipa | grep "Runner" | head -20
 
       - name: Upload build log
         if: always()
@@ -82,6 +92,14 @@ jobs:
         with:
           name: build-log
           path: /tmp/build_log.txt
+          retention-days: 7
+
+      - name: Upload pod log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pod-log
+          path: /tmp/pod_log.txt
           retention-days: 7
 
       - name: Upload .ipa artifact
