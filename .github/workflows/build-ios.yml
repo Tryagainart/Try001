@@ -57,11 +57,23 @@ jobs:
           fi
           
           echo "Found valid Runner.app at: $APP_PATH"
+          echo "=== App contents ==="
+          ls -la "$APP_PATH/"
+          echo "=== App size ==="
+          du -sh "$APP_PATH"
+          
+          # 用 ditto 保留符号链接和权限（cp -r 会破坏 .app 结构）
           mkdir -p Payload
-          cp -r "$APP_PATH" Payload/Runner.app
-          zip -r -9 TaskPlanner.ipa Payload/
-          echo "=== .ipa verification ==="
-          unzip -l TaskPlanner.ipa | grep "Runner" | head -20
+          ditto "$APP_PATH" Payload/Runner.app
+          
+          # 打包（不压缩可执行文件）
+          zip -r -0 TaskPlanner.ipa Payload/Runner.app/Runner Payload/Runner.app/Frameworks
+          zip -r -9 TaskPlanner.ipa Payload/ --exclude "Payload/Runner.app/Runner" --exclude "Payload/Runner.app/Frameworks/*"
+          
+          echo "=== .ipa size ==="
+          du -sh TaskPlanner.ipa
+          echo "=== .ipa structure ==="
+          unzip -l TaskPlanner.ipa | head -30
 
       - name: Upload build log
         if: always()
